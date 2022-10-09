@@ -3,13 +3,14 @@ use std::sync::Arc;
 use log::error;
 
 use math::{Vec3, Real};
+use na::{pi, quarter_pi};
 use pixels::{SurfaceTexture, Pixels, Error};
 use rand::{RngCore, Rng, distributions::Uniform};
 use scene::{sphere::Sphere, Hittable, scene::Scene, camera::Camera};
 use winit::{event_loop::{self, EventLoop, ControlFlow}, dpi::LogicalSize, window::WindowBuilder, event::{Event, VirtualKeyCode}};
 use winit_input_helper::WinitInputHelper;
 
-use crate::scene::material::*;
+use crate::{scene::material::*, math::PI};
 
 extern crate nalgebra_glm as na;
 
@@ -19,6 +20,8 @@ mod scene;
 const WIDTH: u32 = 400;
 const ASPECT_RATIO: Real = 16.0 / 9.0;
 const HEIGHT: u32 = (WIDTH as Real / ASPECT_RATIO) as u32;
+
+const CAMERA_SPEED: Real = 0.05;
 
 fn gen_image(frame: &mut [u8], rng: &mut dyn RngCore, cam: &Camera, scene: &Scene, width: u32, height: u32, samples: u32) {
 
@@ -75,22 +78,22 @@ fn main() -> Result<(), Error> {
     use std::time::Instant;
     println!("Hello, world!");
 
-
+    
     let event_loop = EventLoop::new();
     let mut input = WinitInputHelper::new();
 
     let window = {
         let size = LogicalSize::new(WIDTH as f64, HEIGHT as f64);
-
+        
         WindowBuilder::new()
             .with_title("Raytracer")
             .with_inner_size(size)
             .with_min_inner_size(size)
             .build(&event_loop)
             .unwrap()
-    };
+        };
 
-    let mut pixels = {
+        let mut pixels = {
         let window_size = window.inner_size();
         let surface_texture = SurfaceTexture::new(window_size.width, window_size.height, &window);
         Pixels::new(WIDTH, HEIGHT, surface_texture)?
@@ -99,18 +102,25 @@ fn main() -> Result<(), Error> {
 
     let mut rng = rand::thread_rng();
 
-    let mat_ground = Arc::new(Lambertian {albedo: Vec3::new(0.8, 0.8, 0.0)});
-    let mat_center = Arc::new(Lambertian {albedo: Vec3::new(0.1, 0.2, 0.5)});
-    let mat_left = Arc::new(Dielectric::new(1.5));
-    let mat_right = Arc::new(Metal::new(Vec3::new(0.8, 0.6, 0.2), 0.0));
+    let mat_left = Arc::new(Lambertian { albedo: Vec3::z() });
+    let mat_right = Arc::new(Lambertian { albedo: Vec3::x() });
 
     let mut origin = Vec3::zeros();
 
-    let mut camera = Camera::new(origin, ASPECT_RATIO, 2.0, 1.0);
-
+    let R: Real = quarter_pi::<Real>().cos();
     
     let scene = Scene::new(vec![
         Box::new(Sphere {
+            center: Vec3::new(-R, 0.0, -1.0),
+            radius: R,
+            material: mat_left.clone()
+        }),
+        Box::new(Sphere {
+            center: Vec3::new(R, 0.0, -1.0),
+            radius: R,
+            material: mat_right.clone()
+        }),
+        /*Box::new(Sphere {
             center: Vec3::new(0.0, -100.5, -1.0),
             radius: 100.0,
             material: mat_ground.clone()
@@ -134,8 +144,14 @@ fn main() -> Result<(), Error> {
             center: Vec3::new(1.0, 0.0, -1.0),
             radius: 0.5,
             material: mat_right.clone()
-        }),
+        }),*/
     ]);
+
+    let mut cam_pos = Vec3::new(-2.0, 2.0, 1.0);
+    let cam_lookat = -Vec3::z();
+    let cam_up = Vec3::y();
+
+    let mut camera = Camera::new(cam_pos, &cam_lookat, &cam_up, 90.0, ASPECT_RATIO);
     
     let now = Instant::now();
 
@@ -168,13 +184,13 @@ fn main() -> Result<(), Error> {
 
 
             if input.key_pressed(VirtualKeyCode::Left) {
-                origin -= Vec3::x();
-                camera = Camera::new(origin, ASPECT_RATIO, 2.0, 1.0);
+                cam_pos -= (cam_lookat - cam_pos).normalize().cross(&cam_up).normalize() * CAMERA_SPEED;
+                camera = Camera::new(cam_pos, &cam_lookat, &cam_up, 90.0, ASPECT_RATIO);
             }
 
             if input.key_pressed(VirtualKeyCode::Right) {
-                origin += Vec3::x();
-                camera = Camera::new(origin, ASPECT_RATIO, 2.0, 1.0);
+                cam_pos += (cam_lookat - cam_pos).normalize().cross(&cam_up).normalize() * CAMERA_SPEED;
+                camera = Camera::new(cam_pos, &cam_lookat, &cam_up, 90.0, ASPECT_RATIO);
             }
 
             // Resize the window
