@@ -29,16 +29,30 @@ impl Hittable for Sphere {
         let discriminant = half_b * half_b - a * c;
 
         if discriminant < 0.0 {
-            None
-        } else {
-            let t = ((-half_b - discriminant.sqrt()) / a);
-            let hitPoint = ray.origin() + (t * ray.direction());
-            Some(HitRecord {
-                pos: hitPoint,
-                normal: -(hitPoint - self.center) / self.radius,
-                t: t,
-            })
+            return None
         }
+        let sqrtd = discriminant.sqrt();
+
+        let mut root = (-half_b - sqrtd) / a;
+        if root < t_min || t_max < root {
+            root = (-half_b + sqrtd) / a;
+            if root < t_min || t_max < root {
+                return None
+            }
+        }
+
+        let t = root;
+        let hit_point = ray.at(t);
+        let mut rec = HitRecord {
+            pos: hit_point,
+            normal: (hit_point - self.center) / self.radius,
+            t: t,
+            front_face: false,
+            mat: self.material.clone()
+        };
+
+        rec.set_face_normal(ray, (rec.pos - self.center) / self.radius);
+        Some(rec)
     }
 }
 
