@@ -8,6 +8,7 @@ pub mod scene;
 pub mod sphere;
 pub mod material;
 pub mod camera;
+pub mod portal;
 
 pub struct HitRecord {
     pub pos: Vec3,

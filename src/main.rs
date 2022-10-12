@@ -10,7 +10,7 @@ use scene::{sphere::Sphere, Hittable, scene::Scene, camera::Camera};
 use winit::{event_loop::{self, EventLoop, ControlFlow}, dpi::LogicalSize, window::WindowBuilder, event::{Event, VirtualKeyCode}};
 use winit_input_helper::WinitInputHelper;
 
-use crate::{scene::material::*, math::PI};
+use crate::{scene::{material::*, portal::Portal}, math::PI};
 
 extern crate nalgebra_glm as na;
 
@@ -21,7 +21,7 @@ const WIDTH: u32 = 400;
 const ASPECT_RATIO: Real = 16.0 / 9.0;
 const HEIGHT: u32 = (WIDTH as Real / ASPECT_RATIO) as u32;
 
-const CAMERA_SPEED: Real = 0.05;
+const CAMERA_SPEED: Real = 2.5;
 
 fn gen_image(frame: &mut [u8], rng: &mut dyn RngCore, cam: &Camera, scene: &Scene, width: u32, height: u32, samples: u32) {
 
@@ -120,6 +120,7 @@ fn main() -> Result<(), Error> {
             radius: R,
             material: mat_right.clone()
         }),
+        Box::new(Portal::new([R, 1.0, -1.0].into(), [-2.0 * R, 0.0, -1.0].into())),
         /*Box::new(Sphere {
             center: Vec3::new(0.0, -100.5, -1.0),
             radius: 100.0,
