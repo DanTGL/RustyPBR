@@ -5,10 +5,12 @@ use log::error;
 use math::{Vec3, Real};
 use na::{pi, quarter_pi};
 use pixels::{SurfaceTexture, Pixels, Error};
-use rand::{RngCore, Rng, distributions::Uniform};
+use rand::{RngCore, Rng, distributions::Uniform, thread_rng};
 use scene::{sphere::Sphere, Hittable, scene::Scene, camera::Camera};
 use winit::{event_loop::{self, EventLoop, ControlFlow}, dpi::LogicalSize, window::WindowBuilder, event::{Event, VirtualKeyCode}};
 use winit_input_helper::WinitInputHelper;
+
+use rayon::prelude::*;
 
 use crate::{scene::material::*, math::PI};
 
@@ -33,7 +35,8 @@ fn gen_image(frame: &mut [u8], rng: &mut dyn RngCore, cam: &Camera, scene: &Scen
     //let s1 = Sphere::new(Vec3::new(0.0, 0.0, -1.0), 0.5);
 
     //for (x, y, pixel) in imgbuf.enumerate_pixels_mut() {
-    for (i, pixel) in frame.chunks_exact_mut(4).enumerate() {
+    frame.par_chunks_exact_mut(4).enumerate().for_each(|(i, pixel)| {
+        let mut r = thread_rng();
         //let u = (x as Real) / ((WIDTH - 1) as Real);
         //let v = (y as Real) / ((HEIGHT - 1) as Real);
         let x = (i % width as usize) as u32;
@@ -44,12 +47,12 @@ fn gen_image(frame: &mut [u8], rng: &mut dyn RngCore, cam: &Camera, scene: &Scen
 
         
         for _ in 0..samples {
-            let u = (x as Real + rng.sample(Uniform::new_inclusive(0.0 as Real, 1.0 as Real))) / (width as Real - 1.0);
-            let v = ((height - y - 1) as Real + rng.sample(Uniform::new_inclusive(0.0, 1.0))) / (height as Real - 1.0);
+            let u = (x as Real + r.sample(Uniform::new_inclusive(0.0 as Real, 1.0 as Real))) / (width as Real - 1.0);
+            let v = ((height - y - 1) as Real + r.sample(Uniform::new_inclusive(0.0, 1.0))) / (height as Real - 1.0);
 
             let ray = cam.get_ray(u, v);
 
-            if let Some(col) = scene.raytrace(rng, &ray, 16) {
+            if let Some(col) = scene.raytrace(&mut r, &ray, 16) {
                 //let col = 0.5 * (rec. + Vec3::new(1.0, 1.0, 1.0));
                 //*pixel = Rgb([col.x as f32, col.y as f32, col.z as f32]);
                 color += col;
@@ -70,7 +73,7 @@ fn gen_image(frame: &mut [u8], rng: &mut dyn RngCore, cam: &Camera, scene: &Scen
 
         pixel.copy_from_slice(&col_arr)
         
-    }
+    });
 
 }
 
@@ -91,9 +94,9 @@ fn main() -> Result<(), Error> {
             .with_min_inner_size(size)
             .build(&event_loop)
             .unwrap()
-        };
+    };
 
-        let mut pixels = {
+    let mut pixels = {
         let window_size = window.inner_size();
         let surface_texture = SurfaceTexture::new(window_size.width, window_size.height, &window);
         Pixels::new(WIDTH, HEIGHT, surface_texture)?
@@ -186,18 +189,17 @@ fn main() -> Result<(), Error> {
             if input.key_pressed(VirtualKeyCode::Left) {
                 cam_pos -= (cam_lookat - cam_pos).normalize().cross(&cam_up).normalize() * CAMERA_SPEED;
                 camera = Camera::new(cam_pos, &cam_lookat, &cam_up, 90.0, ASPECT_RATIO);
-            }
-
-            if input.key_pressed(VirtualKeyCode::Right) {
+                window.request_redraw();
+            } else if input.key_pressed(VirtualKeyCode::Right) {
                 cam_pos += (cam_lookat - cam_pos).normalize().cross(&cam_up).normalize() * CAMERA_SPEED;
                 camera = Camera::new(cam_pos, &cam_lookat, &cam_up, 90.0, ASPECT_RATIO);
+                window.request_redraw();
             }
 
             // Resize the window
             if let Some(size) = input.window_resized() {
                 pixels.resize_surface(size.width, size.height);
             }
-            window.request_redraw();
         }
     });
     

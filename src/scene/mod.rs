@@ -29,7 +29,7 @@ impl HitRecord {
     }
 }
 
-pub trait Hittable {
+pub trait Hittable: Send + Sync {
     fn hit(&self, ray: &Ray, t_min: Real, t_max: Real) -> Option<HitRecord> {
         None
     }
