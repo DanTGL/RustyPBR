@@ -1,7 +1,7 @@
-
 use std::sync::Arc;
 use log::error;
-
+use imgui::{Context, FontSource};
+use imgui_winit_support::{HiDpiMode, WinitPlatform};
 use math::{Vec3, Real};
 use na::{pi, quarter_pi};
 use pixels::{SurfaceTexture, Pixels, Error};
@@ -12,12 +12,14 @@ use winit_input_helper::WinitInputHelper;
 
 use rayon::prelude::*;
 
-use crate::{scene::material::*, math::PI};
+use crate::{scene::material::*, math::PI, window::create_window};
 
 extern crate nalgebra_glm as na;
 
+mod window;
 mod math;
 mod scene;
+mod gui;
 
 const WIDTH: u32 = 400;
 const ASPECT_RATIO: Real = 16.0 / 9.0;
@@ -81,20 +83,9 @@ fn main() -> Result<(), Error> {
     use std::time::Instant;
     println!("Hello, world!");
 
-    
-    let event_loop = EventLoop::new();
     let mut input = WinitInputHelper::new();
-
-    let window = {
-        let size = LogicalSize::new(WIDTH as f64, HEIGHT as f64);
-        
-        WindowBuilder::new()
-            .with_title("Raytracer")
-            .with_inner_size(size)
-            .with_min_inner_size(size)
-            .build(&event_loop)
-            .unwrap()
-    };
+    
+    let (event_loop, window) = create_window(WIDTH, HEIGHT);
 
     let mut pixels = {
         let window_size = window.inner_size();
@@ -158,12 +149,24 @@ fn main() -> Result<(), Error> {
     
     let now = Instant::now();
 
+    let mut gui = gui::Gui::new(&window, &pixels);
+
     event_loop.run(move |event, _, control_flow| {
         if let Event::RedrawRequested(_) = event {
-            gen_image(pixels.get_frame(), &mut rng, &camera, &scene, WIDTH, HEIGHT, 16);
 
-            if pixels
-                .render()
+            gen_image(pixels.get_frame_mut(), &mut rng, &camera, &scene, WIDTH, HEIGHT, 16);
+
+            // Prepare Dear ImGui
+            gui.prepare(&window).expect("gui.prepare() failed");
+
+            let render_result = pixels.render_with(|encoder, render_target, context| {
+                context.scaling_renderer.render(encoder, render_target);
+
+                gui.render(&window, encoder, render_target, context)?;
+                Ok(())
+            });
+
+            if render_result
                 .map_err(|e| error!("pixels.render() failed: {}", e))
                 .is_err() {
                     *control_flow = ControlFlow::Exit;
@@ -172,6 +175,8 @@ fn main() -> Result<(), Error> {
                     return;
                 }
         }
+
+        gui.handle_event(&window, &event);
 
         // Handle input events
         if input.update(&event) {
@@ -183,10 +188,7 @@ fn main() -> Result<(), Error> {
                 return;
             }
 
-            
-
-
-            if input.key_pressed(VirtualKeyCode::Left) {
+            /*if input.key_pressed(VirtualKeyCode::Left) {
                 cam_pos -= (cam_lookat - cam_pos).normalize().cross(&cam_up).normalize() * CAMERA_SPEED;
                 camera = Camera::new(cam_pos, &cam_lookat, &cam_up, 90.0, ASPECT_RATIO);
                 window.request_redraw();
@@ -194,12 +196,18 @@ fn main() -> Result<(), Error> {
                 cam_pos += (cam_lookat - cam_pos).normalize().cross(&cam_up).normalize() * CAMERA_SPEED;
                 camera = Camera::new(cam_pos, &cam_lookat, &cam_up, 90.0, ASPECT_RATIO);
                 window.request_redraw();
-            }
+            }*/
 
+            if cam_pos.ne(&gui.pos) {
+                cam_pos = gui.pos;
+                camera = Camera::new(cam_pos, &cam_lookat, &cam_up, 90.0, ASPECT_RATIO);
+            }
             // Resize the window
             if let Some(size) = input.window_resized() {
                 pixels.resize_surface(size.width, size.height);
             }
+
+            window.request_redraw();
         }
     });
     
@@ -207,6 +215,4 @@ fn main() -> Result<(), Error> {
         let img: RgbImage = 
         img.save("image.png").unwrap();
     }*/
-    
-    
 }
