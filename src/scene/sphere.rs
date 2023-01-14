@@ -48,7 +48,9 @@ impl Hittable for Sphere {
             normal: (hit_point - self.center) / self.radius,
             t: t,
             front_face: false,
-            mat: self.material.clone()
+            mat: self.material.clone(),
+            #[cfg(feature = "debug")]
+            hit_edge: discriminant <= 0.025,
         };
 
         rec.set_face_normal(ray, (rec.pos - self.center) / self.radius);

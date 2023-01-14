@@ -42,6 +42,11 @@ impl Scene {
 
         if let Some(rec) = self.hit(rng, ray, 0.001, Real::INFINITY) {
             //let target = rec.pos + rec.normal + Vec3::random_in_unit_sphere(rng);
+            #[cfg(feature = "debug")]
+            if rec.hit_edge {
+                return Some([0.0, 0.0, 0.0].into());
+            }
+
             if let Some(scatter) = rec.mat.scatter(rng, ray, &rec) {
                 Some(scatter.attenuation.component_mul(&self.raytrace(rng, &scatter.scattered, depth - 1)?))
             } else {

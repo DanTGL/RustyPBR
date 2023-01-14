@@ -14,7 +14,9 @@ pub struct HitRecord {
     pub normal: Vec3,
     pub t: Real,
     pub front_face: bool,
-    pub mat: Arc<dyn Material>
+    pub mat: Arc<dyn Material>,
+    #[cfg(feature = "debug")]
+    pub hit_edge: bool,
 }
 
 impl HitRecord {
