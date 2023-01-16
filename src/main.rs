@@ -151,10 +151,15 @@ fn main() -> Result<(), Error> {
 
     let mut gui = gui::Gui::new(&window, &pixels);
 
+    let mut is_dirty = true;
+
     event_loop.run(move |event, _, control_flow| {
         if let Event::RedrawRequested(_) = event {
 
-            gen_image(pixels.get_frame_mut(), &mut rng, &camera, &scene, WIDTH, HEIGHT, 16);
+            if is_dirty {
+                gen_image(pixels.get_frame_mut(), &mut rng, &camera, &scene, WIDTH, HEIGHT, 16);
+                is_dirty = false;
+            }
 
             // Prepare Dear ImGui
             gui.prepare(&window).expect("gui.prepare() failed");
@@ -201,6 +206,7 @@ fn main() -> Result<(), Error> {
             if cam_pos.ne(&gui.pos) {
                 cam_pos = gui.pos;
                 camera = Camera::new(cam_pos, &cam_lookat, &cam_up, 90.0, ASPECT_RATIO);
+                is_dirty = true;
             }
             // Resize the window
             if let Some(size) = input.window_resized() {
