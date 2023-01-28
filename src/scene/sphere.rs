@@ -56,5 +56,12 @@ impl Hittable for Sphere {
         rec.set_face_normal(ray, (rec.pos - self.center) / self.radius);
         Some(rec)
     }
+
+    fn bounding_box(&self, t0: Real, t1: Real) -> Option<AABB> {
+        Some(AABB {
+            min: self.center - Vec3::from_element(self.radius),
+            max: self.center + Vec3::from_element(self.radius)
+        })
+    }
 }
 
