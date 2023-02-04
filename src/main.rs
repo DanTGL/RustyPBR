@@ -2,7 +2,7 @@ use std::sync::Arc;
 use log::error;
 use imgui::{Context, FontSource};
 use imgui_winit_support::{HiDpiMode, WinitPlatform};
-use math::{Vec3, Real};
+use math::{Vec3, Real, RandomVec};
 use na::{pi, quarter_pi};
 use pixels::{SurfaceTexture, Pixels, Error};
 use rand::{RngCore, Rng, distributions::Uniform, thread_rng};
@@ -12,7 +12,7 @@ use winit_input_helper::WinitInputHelper;
 
 use rayon::prelude::*;
 
-use crate::{scene::material::*, math::PI, window::create_window};
+use crate::{scene::{material::*, bvh::BVH}, math::PI, window::create_window};
 
 extern crate nalgebra_glm as na;
 
@@ -26,6 +26,42 @@ const ASPECT_RATIO: Real = 16.0 / 9.0;
 const HEIGHT: u32 = (WIDTH as Real / ASPECT_RATIO) as u32;
 
 const CAMERA_SPEED: Real = 0.05;
+
+fn random_scene(rng: &mut dyn RngCore) -> Vec<Box<dyn Hittable>> {
+    let mut objects = Vec::new();
+
+    for a in -11..11 {
+        for b in -11..11 {
+            let choose_mat = rng.gen::<Real>();
+
+            let center = Vec3::new(a as Real + 0.9 * rng.gen::<Real>(), 0.2, b as Real + 0.9 * rng.gen::<Real>());
+
+            if center.metric_distance(&Vec3::new(4.0, 0.2, 0.0)) > 0.9 {
+
+                let sphere_material: Arc<dyn Material> = Arc::new({
+                    //if choose_mat < 0.8 {
+                        // Diffuse
+                        let albedo = Vec3::random(rng, 0.0, 1.0).cross(&Vec3::random(rng, 0.0, 1.0));
+                        Lambertian { albedo: albedo }
+                    /*} else {
+
+                        let material = Dielectric { ir: 1.5 };
+
+                        material as dyn Material
+                    }*/
+                });
+
+                objects.push(Box::new(Sphere { center: center, radius: 0.2, material: sphere_material }) as Box<dyn Hittable> );
+
+
+                    
+            }
+        }
+            
+    }
+
+    objects
+}
 
 fn gen_image(frame: &mut [u8], rng: &mut dyn RngCore, cam: &Camera, scene: &Scene, width: u32, height: u32, samples: u32) {
 
@@ -54,7 +90,7 @@ fn gen_image(frame: &mut [u8], rng: &mut dyn RngCore, cam: &Camera, scene: &Scen
 
             let ray = cam.get_ray(u, v);
 
-            if let Some(col) = scene.raytrace(&mut r, &ray, 16) {
+            if let Some(col) = scene.raytrace(&mut r, &ray, 32) {
                 //let col = 0.5 * (rec. + Vec3::new(1.0, 1.0, 1.0));
                 //*pixel = Rgb([col.x as f32, col.y as f32, col.z as f32]);
                 color += col;
@@ -102,8 +138,8 @@ fn main() -> Result<(), Error> {
     let mut origin = Vec3::zeros();
 
     let R: Real = quarter_pi::<Real>().cos();
-    
-    let scene = Scene::new(vec![
+
+    /*let objects: Vec<Box<dyn Hittable>> = vec![
         Box::new(Sphere {
             center: Vec3::new(-R, 0.0, -1.0),
             radius: R,
@@ -114,6 +150,29 @@ fn main() -> Result<(), Error> {
             radius: R,
             material: mat_right.clone()
         }),
+        Box::new(Sphere {
+            center: Vec3::new(-1.0, 0.0, -1.0),
+            radius: 0.5,
+            material: mat_left.clone()
+        }),
+        Box::new(Sphere {
+            center: Vec3::new(-1.0, 0.0, -1.0),
+            radius: -0.4,
+            material: mat_left.clone()
+        }),
+        Box::new(Sphere {
+            center: Vec3::new(1.0, 0.0, -1.0),
+            radius: 0.5,
+            material: mat_right.clone()
+        }),
+    ];*/
+
+    let objects = random_scene(&mut rng);
+    
+    let bvh = Box::new(BVH::new(&mut rng, objects, 0.0, 0.0).unwrap());
+
+    let scene = Scene::new(vec![
+        bvh,
         /*Box::new(Sphere {
             center: Vec3::new(0.0, -100.5, -1.0),
             radius: 100.0,
@@ -157,7 +216,7 @@ fn main() -> Result<(), Error> {
         if let Event::RedrawRequested(_) = event {
 
             if is_dirty {
-                gen_image(pixels.get_frame_mut(), &mut rng, &camera, &scene, WIDTH, HEIGHT, 16);
+                gen_image(pixels.get_frame_mut(), &mut rng, &camera, &scene, WIDTH, HEIGHT, 12);
                 is_dirty = false;
             }
 

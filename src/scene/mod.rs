@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{sync::Arc, cmp::Ordering};
 
 use crate::math::{Real, ray::Ray, Vec3};
 
@@ -8,7 +8,9 @@ pub mod scene;
 pub mod sphere;
 pub mod material;
 pub mod camera;
+pub mod bvh;
 
+#[derive(Copy, Clone)]
 pub struct AABB {
     pub min: Vec3,
     pub max: Vec3,
@@ -46,6 +48,37 @@ impl AABB {
         }
 
         return true;
+    }
+
+}
+
+pub fn box_compare(a: &dyn Hittable, b: &dyn Hittable, axis: u8) -> Option<Ordering> {
+    let box_a = a.bounding_box(0.0, 0.0);
+    let box_b = b.bounding_box(0.0, 0.0);
+
+    if box_a.is_none() || box_b.is_none() {
+        println!("No bounding box in BVHNode constructor.");
+    }
+
+    box_a.unwrap().min[axis as usize].partial_cmp(&box_b.unwrap().min[axis as usize])
+}
+
+pub fn surrounding_box(box0: AABB, box1: AABB) -> AABB {
+    let small: Vec3 = Vec3::from([
+        box0.min.x.min(box1.min.x),
+        box0.min.y.min(box1.min.y),
+        box0.min.z.min(box1.min.z)
+    ]);
+
+    let big: Vec3 = Vec3::from([
+        box0.max.x.max(box1.max.x),
+        box0.max.y.max(box1.max.y),
+        box0.max.z.max(box1.max.z)
+    ]);
+
+    AABB {
+        min: small,
+        max: big,
     }
 }
 
